@@ -2,7 +2,7 @@
 #include "Arduino.h" 
 #include "math.h"
 
-contServo::contServo(int pin, Encoder& encoder) : servoPin(pin), encoder(encoder), defaultSpd(1500), tolerance(5), servoSpd(defaultSpd), rotateSpd(0), totalSpd(1500), error(0.0), integral(0.0), previousError(0.0), previousTime(0), driveDirection(1){
+contServo::contServo(int pin, Encoder& encoder) : servoPin(pin), encoder(encoder), defaultSpd(1500), tolerance(5), servoSpd(defaultSpd), rotateSpd(0), totalSpd(1500), error(0.0), integral(0.0), previousError(0.0), previousTime(0), driveDirection(1), maxOmegaDegPerSec(500.0f), maxAlphaDegPerSec2(4000.0f), omegaCmd(0.0f), kp(3.5f), ki(0.0f), kd(0.5f){
 }
 
 void contServo::setSpeed(int speed){
@@ -49,19 +49,27 @@ void contServo::goToAngle(int angle) {
     driveDirection = +1; //forward
   }
 
-  float kp = 3.5;
-  float ki = -1.0;
-  float kd = 0.5;
-
+  // PID with positive KI (integrator winds toward reducing steady-state error)
   integral += error * dt;
   float derivative = (error - previousError) / dt;
+  float rawOmega = (kp * error) + (ki * integral) + (kd * derivative); // deg/s equivalent
 
-  int pidOutput = (kp * error) + (ki * integral) + (kd * derivative);
+  // Velocity and acceleration limiting for smoothness
+  float maxDeltaOmega = maxAlphaDegPerSec2 * dt;
+  if (rawOmega >  maxOmegaDegPerSec) rawOmega =  maxOmegaDegPerSec;
+  if (rawOmega < -maxOmegaDegPerSec) rawOmega = -maxOmegaDegPerSec;
+  float delta = rawOmega - omegaCmd;
+  if (delta >  maxDeltaOmega) delta =  maxDeltaOmega;
+  if (delta < -maxDeltaOmega) delta = -maxDeltaOmega;
+  omegaCmd += delta;
 
-  totalSpd = defaultSpd + pidOutput;
+  // Map omegaCmd (deg/s) to servo microseconds around 1500
+  const float usPerDegPerSec = 1.0f; // tune experimentally
+  totalSpd = (int)(defaultSpd + omegaCmd * usPerDegPerSec);
 
   if (abs(error) <= tolerance) {
     stop();
+    omegaCmd = 0.0f;
   } else {
     totalSpd = constrain(totalSpd, 1200, 1800);
     setSpeed(totalSpd);
@@ -69,4 +77,17 @@ void contServo::goToAngle(int angle) {
 
   previousError = error;
   previousTime = currTime;
+}
+
+void contServo::configureLimits(float maxOmegaDegSec, float maxAlphaDegSec2) {
+  if (maxOmegaDegSec < 10.0f) maxOmegaDegSec = 10.0f;
+  if (maxAlphaDegSec2 < 100.0f) maxAlphaDegSec2 = 100.0f;
+  this->maxOmegaDegPerSec = maxOmegaDegSec;
+  this->maxAlphaDegPerSec2 = maxAlphaDegSec2;
+}
+
+void contServo::setPIDGains(float p, float i, float d) {
+  this->kp = p;
+  this->ki = i;
+  this->kd = d;
 }

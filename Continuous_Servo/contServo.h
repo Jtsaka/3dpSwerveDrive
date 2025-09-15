@@ -17,6 +17,9 @@ class contServo {
     float previousError;
     unsigned long previousTime;
     int driveDirection;
+    float maxOmegaDegPerSec;
+    float maxAlphaDegPerSec2;
+    float omegaCmd;
 
     Servo servo;
     Encoder& encoder;
@@ -30,6 +33,13 @@ class contServo {
     void setZero();
     void goToAngle(int angle);
     int closestAngle(int a, int b);
+    void configureLimits(float maxOmegaDegSec, float maxAlphaDegSec2);
+    void setPIDGains(float kp, float ki, float kd);
+
+  private:
+    float kp;
+    float ki;
+    float kd;
 
 };
 
