@@ -16,19 +16,32 @@
 void setup() {
   Serial.begin(500000); //baud rate
   servoA.initialize();
-  // sparkA.initialize();
   Serial.println("Starting...");
-
 }
 
-void loop() {
-  if (Serial.available() > 0) {
-      String data = Serial.readStringUntil('\n');
-      commands(data);      
-  }
-  servoA.goToAngle(targetAngle);
+static unsigned long nextTickUs = 0;
+static const unsigned long CONTROL_PERIOD_US = 1000; // 1 kHz loop
+static String serialBuf;
 
-  // Serial.println("Left joystick X value: " + String(Vx) + " |   Left joystick Y value: " + String(Vy) + " | Curr Angle: " + String(encoderA.readAngle()) + " | Target angle: " + String(targetAngle));
+void loop() {
+  // Non-blocking serial parse for combined LX&LY
+  while (Serial.available() > 0) {
+    char c = (char)Serial.read();
+    if (c == '\n') {
+      if (serialBuf.length() > 0) {
+        commands(serialBuf);
+        serialBuf = "";
+      }
+    } else if (c != '\r') {
+      serialBuf += c;
+    }
+  }
+
+  unsigned long nowUs = micros();
+  if ((long)(nowUs - nextTickUs) >= 0) {
+    nextTickUs = nowUs + CONTROL_PERIOD_US;
+    servoA.goToAngle(targetAngle);
+  }
 }
 
 void updateAngle(int x, int y){
