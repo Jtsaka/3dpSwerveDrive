@@ -1,83 +1,73 @@
-  #include "contServo.h"
-  #include "encoder.h"
-  #include "spark.h"
+#include "contServo.h"
+#include "encoder.h"
 
-  contServo servoA(5); //module 3
-  Spark sparkA(9); //module 3
+  Encoder encoderA(A3);
+  contServo servoA(5, encoderA); //module 3
+  // Spark sparkA(9); //module 3
+ 
+  int Vx = 0;    
+  int Vy = 0;    
+  const int deadzone = 3000;
+  // int defaultSpd = 1500;
+  int motorSpd = 1500; //ignore
+  int targetAngle = 0;
+  unsigned long lastPrint = 0;
 
-  Encoder encoderA(A3, servoA, sparkA); //encoder to module 1
-  
-  int Vx = 0;    //X translation from joystick
-  int Vy = 0;    //Y translation from joystick
-  int angle = 0;
-  int deadzone = 1000;
-  int defaultSpd = 1500;
-  int speedFactor = 300;
+void setup() {
+  Serial.begin(500000); //baud rate
+  servoA.initialize();
+  // sparkA.initialize();
+  Serial.println("Starting...");
 
-  void setup() {
-    
-      Serial.begin(500000); //baud rate
+}
 
-      sparkA.initialize();
-      encoderA.goToDefaultPos();
-      encoderA.goToAngle();
-      servoA.initialize();
-
-  }
-
-  void loop() {
-    if (Serial.available() > 0) {
+void loop() {
+  if (Serial.available() > 0) {
       String data = Serial.readStringUntil('\n');
-      commands(data);
-          
-      encoderA.setTargetAngle(angle);
-      
-      delay(100);  //Small delay to prevent overwhelming the servo
+      commands(data);      
+  }
+  servoA.goToAngle(targetAngle);
 
+  // Serial.println("Left joystick X value: " + String(Vx) + " |   Left joystick Y value: " + String(Vy) + " | Curr Angle: " + String(encoderA.readAngle()) + " | Target angle: " + String(targetAngle));
+}
+
+void updateAngle(int x, int y){
+    if (abs(x) < deadzone && abs(y) < deadzone){
+      servoA.stop();
+      return;
     }
 
-    encoderA.goToAngle();
+    float angle_radians = atan2(x, y); //if I do atan2(y,x), then 0 on x axis (cartesian), swap to x,y to rotate 90 deg
+    float angle_degrees = angle_radians * (180.0 / PI);  
+    if (angle_degrees < 0) {
+      angle_degrees += 360.0;  //normalize to [0, 360)
+    }
+    
+    targetAngle = (int)round(angle_degrees); 
+    
+    // int currAngle = encoderA.readAngle();  
+    // int difference = (targetAngle - currAngle + 540) % 360 - 180;
+    
+    // int magnitude = sqrt((x * x) + (y * y));
 
+    // if(abs(difference) > 90){
+    //   motorSpd = defaultSpd - (0.01 * magnitude);
+    // }
+
+    // else{
+    //   motorSpd = defaultSpd + (0.01 * magnitude);
+    // }
+    
+    // sparkA.setSpeed(motorSpd);
+    // else{
+    //    sparkA.setSpeed(defaultSpd);
+    // }
   }
 
-//UP/DOWN = 0 degrees, LEFT/RIGHT = 90 degrees, DIAGONAL CALCULATED THROUGH ARCTAN
-
-  void updateAngle(int x, int y){
-    if(abs(x) <= deadzone && abs(y) <= deadzone){
-      sparkA.setSpeed(defaultSpd);
-    }
-    else if(abs(x) <= deadzone && abs(y) > deadzone){
-      if(y > 0){ //angle = (y > 0) ? 0 : 180;
-        angle = 0;
-        sparkA.setSpeed(defaultSpd + speedFactor);
-      }
-      else{
-        angle = 180;
-        sparkA.setSpeed(defaultSpd - speedFactor);
-      }
-    }
-    else if(abs(y) <= deadzone && abs(x) > deadzone){
-      if(x > 0){ //angle = (x > 0) ? 90 : 270;
-        angle = 90;
-        sparkA.setSpeed(defaultSpd + speedFactor);
-      }
-      else{
-        angle = 270;
-        sparkA.setSpeed(defaultSpd - speedFactor);
-      }
-    }
-    else{
-      if(abs(y) >= deadzone && abs(x) >= deadzone){
-        int angle_radians = atan2(y, x);
-        angle = angle_radians * (180 / M_PI);
-      }
-    }
-  }
-
-  void commands(String data){
+void commands(String data){
     //Drive joystick
     if (data.startsWith("stickLX&LY:")) { 
-        String value = data.substring(11);  //Get the value after "stickLXLY:"
+        String value = data.substring(11);  //get the value after "stickLXLY:"
         int commaSep = value.indexOf(",");
 
         String vxStr = value.substring(0, commaSep);
@@ -87,12 +77,10 @@
 
         updateAngle(Vx, Vy);
 
-        Serial.println("Left joystick X value: " + String(Vx) + " |   Left joystick Y value: " + String(Vy) + " | Current Angle: " + String(encoderA.readAngle()) + " | Target angle: " + String(angle) + " | Output power: " + String(encoderA.goToAngle()));
-
     }
     if (data == "BUTTON_A") {
         Serial.println("Stop");
-        sparkA.stopMotor();
+        servoA.stop();
     }
     //Steer joystick
     // else if (data.startsWith("stickRX:")) {
