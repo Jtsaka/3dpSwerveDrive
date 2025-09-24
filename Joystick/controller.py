@@ -1,10 +1,9 @@
 import xinput
 import time
 import serial
-import driveAndSteer
 
-ser = serial.Serial('COM4', 115200, timeout=1)  #Adjust COM port and baud rate as necessary
-deadzone = 3000
+ser = serial.Serial('COM3', 500000, timeout=1)  #Adjust COM port and baud rate as necessary
+deadzone = 0 #0.1 * 32767
 
 def apply_deadzone(value):
     if abs(value) < deadzone:
@@ -27,6 +26,7 @@ def get_trigger_values(controller_state): #setting up L and R triggers
 
 def main():
     controller_id = 0  #assume controller 0
+    prev_x, prev_y = 0, 0
 
     while True:
         try:
@@ -39,30 +39,20 @@ def main():
             left_thumb_x, left_thumb_y, right_thumb_x, right_thumb_y = get_thumb_values(controller_state)
             trigger_R, trigger_L = get_trigger_values(controller_state)
 
+            #Joystick events
+
+            ###Drive
+            print(f"Raw joystick values - X: {left_thumb_x}, Y: {left_thumb_y}")
+
+            # Only send if left stick values changed
+            if left_thumb_x != prev_x or left_thumb_y != prev_y:
+                ser.write(f"stickLX&LY:{left_thumb_x},{left_thumb_y}\n".encode())
+                prev_x, prev_y = left_thumb_x, left_thumb_y
+
             if buttons & xinput.BUTTON_A:
                 ser.write("BUTTON_A\n".encode())
-            if buttons & xinput.BUTTON_B:
-                ser.write("BUTTON_B\n".encode())
-            if buttons & xinput.BUTTON_Y:
-                ser.write("BUTTON_Y\n".encode())
-            if buttons & xinput.BUTTON_X:
-                ser.write("BUTTON_X\n".encode())
-            if left_thumb_x:
-                ser.write(f"stickLX:{driveAndSteer.joystickDrive(left_thumb_x)}\n".encode())
-            if left_thumb_y:
-                ser.write(f"stickLY:{driveAndSteer.joystickDrive(left_thumb_y)}\n".encode())
-            if right_thumb_x:
-                ser.write(f"stickRX:{driveAndSteer.joystickSteer(right_thumb_x)}\n".encode())
-            if right_thumb_y:
-                ser.write(f"stickRY:{driveAndSteer.joystickSteer(right_thumb_y)}\n".encode())
-            if trigger_R:
-                ser.write(f"triggerR:{trigger_R}\n".encode())
-            if trigger_L:
-                ser.write(f"triggerL:{trigger_L}\n".encode())
 
-            
-
-            time.sleep(0.1)  # Control loop speed
+            time.sleep(0.3)  #Control loop speed
 
         except Exception as e:
             print(f"An error occurred: {e}")
