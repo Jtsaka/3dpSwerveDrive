@@ -1,5 +1,6 @@
 #include "contServo.h"
 #include "encoder.h"
+#include <math.h>
 
   Encoder encoderA(A3);
   contServo servoA(5, encoderA); //module 3
@@ -43,7 +44,7 @@ void updateAngle(int x, int y){
       angle_degrees += 360.0;  //normalize to [0, 360)
     }
     
-    targetAngle = (int)round(angle_degrees); 
+    targetAngle = static_cast<int>(round(angle_degrees));
     
     // int currAngle = encoderA.readAngle();  
     // int difference = (targetAngle - currAngle + 540) % 360 - 180;

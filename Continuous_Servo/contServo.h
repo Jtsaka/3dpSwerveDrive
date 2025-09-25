@@ -17,6 +17,8 @@ class contServo {
     float previousError;
     unsigned long previousTime;
     int driveDirection;
+    int lastRequestedAngle;
+    float lastPidOutput;
 
     Servo servo;
     Encoder& encoder;
@@ -29,7 +31,12 @@ class contServo {
 
     void setZero();
     void goToAngle(int angle);
-    int closestAngle(int a, int b);
+    float closestAngle(float target, float current);
+    int getDriveDirection() const { return driveDirection; }
+    int getCommandedSpeed() const { return totalSpd; }
+    float getLastError() const { return error; }
+    float getIntegral() const { return integral; }
+    float getLastPidOutput() const { return lastPidOutput; }
 
 };
 
